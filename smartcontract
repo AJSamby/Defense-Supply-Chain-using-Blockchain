@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DefenseSupplyChain {
+    
+    uint public itemCount = 0;
+    
+    enum ItemStatus { Ordered, MaterialSupplied, BeingManufactured, Distributed, Wholesaled, Sold, Delivered }
+    
+    struct SupplyChainItem {
+        string name;
+        uint quantity;
+        address supplier;
+        address recipient;
+        ItemStatus status;
+    }
+    
+    mapping(uint => SupplyChainItem) public supplyChainItems;
+    
+    event SupplyChainItemCreated(uint indexed id, string name, uint quantity, address supplier, address recipient, ItemStatus status);
+    event SupplyChainItemOrdered(uint indexed id, address indexed supplier);
+    event SupplyChainItemMaterialSupplied(uint indexed id, address indexed supplier);
+    event SupplyChainItemBeingManufactured(uint indexed id, address indexed manufacturer);
+    event SupplyChainItemDistributed(uint indexed id, address indexed distributor);
+    event SupplyChainItemWholesaled(uint indexed id, address indexed wholesaler);
+    event SupplyChainItemSold(uint indexed id, address indexed retailer);
+    event SupplyChainItemDelivered(uint indexed id, address indexed recipient);
+    
+    function createSupplyChainItem(string memory _name, uint _quantity, address _recipient) public {
+        require(bytes(_name).length > 0, "Name cannot be empty");
+        require(_quantity > 0, "Quantity must be greater than zero");
+        require(_recipient != address(0), "Recipient address cannot be zero");
+        
+        itemCount++;
+        SupplyChainItem storage newItem = supplyChainItems[itemCount];
+        newItem.name = _name;
+        newItem.quantity = _quantity;
+        newItem.supplier = msg.sender;
+        newItem.recipient = _recipient;
+        newItem.status = ItemStatus.Ordered;
+        
+        emit SupplyChainItemCreated(itemCount, _name, _quantity, msg.sender, _recipient, ItemStatus.Ordered);
+        emit SupplyChainItemOrdered(itemCount, msg.sender);
+    }
+    
+    function supplyMaterial(uint _id) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.supplier, "Only supplier can supply material");
+        require(item.status == ItemStatus.Ordered, "Item must be in 'Ordered' status");
+        item.status = ItemStatus.MaterialSupplied;
+        emit SupplyChainItemMaterialSupplied(_id, msg.sender);
+    }
+    
+    function startManufacturing(uint _id) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.supplier, "Only supplier can start manufacturing");
+        require(item.status == ItemStatus.MaterialSupplied, "Item must be in 'MaterialSupplied' status");
+        item.status = ItemStatus.BeingManufactured;
+        emit SupplyChainItemBeingManufactured(_id, msg.sender);
+    }
+    
+    function distributeItem(uint _id, address _distributor) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.supplier, "Only supplier can distribute item");
+        require(item.status == ItemStatus.BeingManufactured, "Item must be in 'BeingManufactured' status");
+        item.recipient = _distributor;
+        item.status = ItemStatus.Distributed;
+        emit SupplyChainItemDistributed(_id, _distributor);
+    }
+
+    function wholesaleItem(uint _id, address _wholesaler) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.recipient, "Only distributor can wholesale item");
+        require(item.status == ItemStatus.Distributed, "Item must be in 'Distributed' status");
+        item.recipient = _wholesaler;
+        item.status = ItemStatus.Wholesaled;
+        emit SupplyChainItemWholesaled(_id, _wholesaler);
+    }
+
+    function sellItem(uint _id, address _retailer) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.recipient, "Only wholesaler can sell item");
+        require(item.status == ItemStatus.Wholesaled, "Item must be in 'Wholesaled' status");
+        item.recipient = _retailer;
+        item.status = ItemStatus.Sold;
+        emit SupplyChainItemSold(_id, _retailer);
+    }
+
+    function deliverItem(uint _id) public {
+        require(_id > 0 && _id <= itemCount, "Invalid item ID");
+        SupplyChainItem storage item = supplyChainItems[_id];
+        require(msg.sender == item.recipient, "Only retailer can deliver item");
+        require(item.status == ItemStatus.Sold, "Item must be in 'Sold' status");
+        item.status = ItemStatus.Delivered;
+        emit SupplyChainItemDelivered(_id, msg.sender);
+    }
+}
